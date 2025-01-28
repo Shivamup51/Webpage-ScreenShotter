@@ -17,7 +17,6 @@ exports.captureScreenshots = async (url) => {
 
     const page = await browser.newPage();
     
-    console.log('Navigating to URL:', url);
     await page.goto(url, { 
       waitUntil: ['networkidle0', 'domcontentloaded'],
       timeout: 60000
@@ -64,7 +63,6 @@ exports.captureScreenshots = async (url) => {
         order: i + 1
       });
 
-      console.log(`Captured screenshot ${i + 1}/${screenshotsCount}`);
     }
 
     return {
