@@ -43,8 +43,10 @@ git clone https://github.com/Shivamup51/Webpage-ScreenShotter.git
 cd Webpage-ScreenShotter
 ```
 
-2. Install dependencies
+2. Install dependencies for both server and client
 ```bash
+cd server
+cd client
 npm install
 # or
 yarn install
