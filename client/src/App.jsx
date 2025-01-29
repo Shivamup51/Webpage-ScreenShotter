@@ -30,7 +30,7 @@ function App() {
       const timestamp = Date.now()
       const folderName = `screenshots_${timestamp}`
 
-      const response = await axios.post("http://localhost:3001/save-screenshots", {
+      const response = await axios.post("https://webpage-screen-shotter.vercel.app/save-screenshots", {
         screenshots,
         folderName
       })
@@ -53,7 +53,7 @@ function App() {
       eventSource.close()
     }
 
-    const sse = new EventSource(`http://localhost:3001/capture-progress?url=${encodeURIComponent(url)}`)
+    const sse = new EventSource(`https://webpage-screen-shotter.vercel.app/capture-progress?url=${encodeURIComponent(url)}`)
     setEventSource(sse)
 
     sse.onmessage = (event) => {
@@ -73,7 +73,7 @@ function App() {
       if (data.screenshots) {
         const processedScreenshots = data.screenshots.map(screenshot => ({
           ...screenshot,
-          imageUrl: `http://localhost:3001${screenshot.imageUrl}`
+          imageUrl: `https://webpage-screen-shotter.vercel.app${screenshot.imageUrl}`
         }))
         setScreenshots(processedScreenshots)
         setIsCapturing(false)
