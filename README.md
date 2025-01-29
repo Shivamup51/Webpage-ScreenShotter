@@ -1,4 +1,3 @@
-
 # Webpage Screenshotter
 
 ## Overview
