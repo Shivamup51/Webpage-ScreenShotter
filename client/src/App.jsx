@@ -15,7 +15,7 @@ function App() {
   const [sessionId] = useState(() => Date.now().toString())
   const [eventSource, setEventSource] = useState(null)
 
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://webpage-screen-shotter.vercel.app"
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://webpage-screen-shotter-u1lc.vercel.app"
 
   // Cleanup function for SSE
   useEffect(() => {
@@ -74,7 +74,7 @@ function App() {
       if (data.screenshots) {
         const processedScreenshots = data.screenshots.map(screenshot => ({
           ...screenshot,
-          imageUrl: `https://webpage-screen-shotter.vercel.app${screenshot.imageUrl}`
+          imageUrl: `${BACKEND_URL}${screenshot.imageUrl}`
         }))
         setScreenshots(processedScreenshots)
         setIsCapturing(false)
