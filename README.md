@@ -21,10 +21,10 @@ Webpage Screenshotter is a web application that allows users to capture multiple
 - **Storage:** Local filesystem / AWS S3 (optional)
 
 ## Screenshots
-
-![img01](https://github.com/user-attachments/assets/12028adc-c549-4f45-b6ca-b946b5123a0b)
-
-![img02](https://github.com/user-attachments/assets/71d4c292-402a-4a30-bc5c-c2b32a3f1fc2)
+![Screenshot 2025-01-29 111758](https://github.com/user-attachments/assets/a61d58f7-86f6-4c35-8538-5bda26bf21ef)
+![Screenshot 2025-01-29 111910](https://github.com/user-attachments/assets/72008a5b-23fd-43d3-be93-35bf736f7cec)
+![Screenshot 2025-01-29 111941](https://github.com/user-attachments/assets/762597f2-6655-49bf-8c7c-9bb7370a1ba1)
+![Screenshot 2025-01-29 111950](https://github.com/user-attachments/assets/8897d28e-10ec-45d2-94f8-4322d618859e)
 
 
 
