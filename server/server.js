@@ -5,7 +5,7 @@ const screenshotRoutes = require("./routes/screenshotRoutes")
 
 const app = express()
 app.use(cors({
-    origin: "https://webpage-screen-shotter-frontend.vercel.app/",
+    origin: "https://webpage-screen-shotter-frontend.vercel.app",
     credentials: true,
     // Add these headers for SSE support
     methods: ["GET", "POST"],
