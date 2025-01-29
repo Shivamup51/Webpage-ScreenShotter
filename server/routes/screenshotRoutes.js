@@ -19,7 +19,7 @@ router.post("/save-screenshots", screenshotController.saveScreenshots)
 
 router.get("/capture-progress", async (req, res) => {
     const { url } = req.query
-    let browser = null;
+    let browser = null
     
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache')
@@ -27,94 +27,123 @@ router.get("/capture-progress", async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
 
     try {
-        // Use chromium for Vercel deployment
-        browser = await puppeteer.launch({
-            args: chrome.args,
-            defaultViewport: chrome.defaultViewport,
+        // Configure chrome options specifically for Vercel
+        const options = {
+            args: [
+                ...chrome.args,
+                "--hide-scrollbars",
+                "--disable-web-security",
+                "--no-sandbox",
+                "--disable-setuid-sandbox"
+            ],
+            defaultViewport: {
+                width: 1920,
+                height: 1080,
+                deviceScaleFactor: 2
+            },
             executablePath: await chrome.executablePath(),
             headless: chrome.headless,
             ignoreHTTPSErrors: true,
-        });
+        }
 
+        browser = await puppeteer.launch(options)
         const page = await browser.newPage()
-        
-        // Set high-quality viewport
-        await page.setViewport({ 
-            width: 1920,    // Full HD width
-            height: 1080,   // Full HD height
-            deviceScaleFactor: 2  // Increased for better quality
-        })
+
+        // Add error handling for navigation
+        await page.setDefaultNavigationTimeout(30000) // 30 seconds timeout
 
         res.write(`data: ${JSON.stringify({ progress: 10 })}\n\n`)
 
-        // Load page and wait for content
-        await page.goto(url, { 
-            waitUntil: 'networkidle0',
-            timeout: 30000 
-        })
-        
-        // Get full page height
-        const pageHeight = await page.evaluate(() => 
-            Math.max(
-                document.documentElement.scrollHeight,
-                document.body.scrollHeight
-            )
-        )
-
-        // Create directory for sequential screenshots
-        const folderName = `webpage_screenshots_${Date.now()}`
-        const screenshotsDir = path.join(__dirname, '..', '..', 'client', 'public', 'screenshots', folderName)
-        await fs.mkdir(screenshotsDir, { recursive: true })
-
-        const screenshots = []
-        const sectionHeight = 1080  // Full HD height
-        const sections = Math.ceil(pageHeight / sectionHeight)
-
-        // Take sequential screenshots
-        for (let i = 0; i < sections; i++) {
-            // Ensure proper sequential naming (img01.png, img02.png, etc.)
-            const fileName = `img${String(i + 1).padStart(2, '0')}.png`
-            const filePath = path.join(screenshotsDir, fileName)
-
-            // Capture screenshot with precise dimensions
-            await page.screenshot({
-                path: filePath,
-                clip: {
-                    x: 0,
-                    y: i * sectionHeight,
-                    width: 1920,
-                    height: Math.min(sectionHeight, pageHeight - (i * sectionHeight))
-                },
-                type: 'png',  // Ensure high quality for AI processing
-                omitBackground: false  // Include background for complete UI capture
+        try {
+            await page.goto(url, { 
+                waitUntil: 'networkidle0',
+                timeout: 30000 
             })
-
-            screenshots.push({
-                fileName,
-                imageUrl: `/screenshots/${folderName}/${fileName}`,
-                order: i + 1
-            })
-
-            const progress = Math.floor(30 + ((i + 1) / sections * 60))
-            res.write(`data: ${JSON.stringify({ progress })}\n\n`)
+        } catch (navigationError) {
+            console.error("Navigation error:", navigationError)
+            res.write(`data: ${JSON.stringify({ error: "Failed to load the webpage. Please check the URL and try again." })}\n\n`)
+            res.end()
+            return
         }
 
-        res.write(`data: ${JSON.stringify({
-            progress: 100,
-            screenshots
-        })}\n\n`)
+        // Get full page height with error handling
+        const pageHeight = await page.evaluate(() => {
+            return Math.max(
+                document.documentElement.scrollHeight,
+                document.body.scrollHeight,
+                1080 // minimum height
+            )
+        })
 
-        await browser.close()
-        res.end()
+        const screenshots = []
+        const sectionHeight = 1080
+        const sections = Math.ceil(pageHeight / sectionHeight)
+
+        for (let i = 0; i < sections; i++) {
+            try {
+                // Scroll and wait for content
+                await page.evaluate((i, height) => {
+                    window.scrollTo(0, i * height)
+                }, i, sectionHeight)
+
+                // Wait for any dynamic content to load
+                await page.waitForTimeout(500)
+
+                // Take screenshot
+                const screenshot = await page.screenshot({
+                    type: 'png',
+                    encoding: 'base64',
+                    clip: {
+                        x: 0,
+                        y: i * sectionHeight,
+                        width: 1920,
+                        height: Math.min(sectionHeight, pageHeight - (i * sectionHeight))
+                    },
+                    omitBackground: false
+                })
+
+                screenshots.push({
+                    fileName: `screenshot_${(i + 1).toString().padStart(2, '0')}.png`,
+                    base64: screenshot,
+                    order: i + 1
+                })
+
+                const progress = Math.floor(30 + ((i + 1) / sections * 60))
+                res.write(`data: ${JSON.stringify({ progress })}\n\n`)
+
+            } catch (screenshotError) {
+                console.error("Screenshot error:", screenshotError)
+                continue
+            }
+        }
+
+        if (screenshots.length > 0) {
+            res.write(`data: ${JSON.stringify({
+                progress: 100,
+                screenshots
+            })}\n\n`)
+        } else {
+            res.write(`data: ${JSON.stringify({ 
+                error: "Failed to capture any screenshots" 
+            })}\n\n`)
+        }
 
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Capture error:", error)
+        res.write(`data: ${JSON.stringify({ 
+            error: "Failed to capture screenshots. Please try again." 
+        })}\n\n`)
+    } finally {
         if (browser) {
             await browser.close()
         }
-        res.write(`data: ${JSON.stringify({ error: "Failed to capture screenshots" })}\n\n`)
         res.end()
     }
+})
+
+// Health check endpoint
+router.get("/health", (req, res) => {
+    res.json({ status: "OK" })
 })
 
 // Add this route to test environment variables
