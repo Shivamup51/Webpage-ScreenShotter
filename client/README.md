@@ -22,9 +22,9 @@ Webpage Screenshotter is a web application that allows users to capture multiple
 
 ## Screenshots
 
-![Screenshot 1](./public/screenshot1.png)
-![Screenshot 2](./public/screenshot2.png)
-![Screenshot 3](./public/screenshot3.png)
+![img01](https://github.com/user-attachments/assets/12028adc-c549-4f45-b6ca-b946b5123a0b)
+
+![img02](https://github.com/user-attachments/assets/71d4c292-402a-4a30-bc5c-c2b32a3f1fc2)
 
 
 
