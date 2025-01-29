@@ -1,7 +1,8 @@
 const express = require("express")
 const router = express.Router()
 const screenshotController = require("../controllers/screenshotController")
-const puppeteer = require("puppeteer")
+const puppeteer = require("puppeteer-core")
+const chrome = require("@sparticuz/chromium")
 const fs = require("fs").promises
 const path = require("path")
 
@@ -26,14 +27,13 @@ router.get("/capture-progress", async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
 
     try {
-        // Launch browser with specific viewport size
+        // Use chromium for Vercel deployment
         browser = await puppeteer.launch({
-            headless: true,
-            defaultViewport: {
-                width: 1920,
-                height: 1080
-            },
-            args: ['--no-sandbox']
+            args: chrome.args,
+            defaultViewport: chrome.defaultViewport,
+            executablePath: await chrome.executablePath(),
+            headless: chrome.headless,
+            ignoreHTTPSErrors: true,
         });
 
         const page = await browser.newPage()
@@ -108,12 +108,21 @@ router.get("/capture-progress", async (req, res) => {
         res.end()
 
     } catch (error) {
+        console.error("Error:", error);
         if (browser) {
             await browser.close()
         }
         res.write(`data: ${JSON.stringify({ error: "Failed to capture screenshots" })}\n\n`)
         res.end()
     }
+})
+
+// Add this route to test environment variables
+router.get("/test-env", (req, res) => {
+    res.json({
+        nodeEnv: process.env.NODE_ENV,
+        frontendUrl: process.env.FRONTEND_URL
+    })
 })
 
 module.exports = router

@@ -15,6 +15,8 @@ function App() {
   const [sessionId] = useState(() => Date.now().toString())
   const [eventSource, setEventSource] = useState(null)
 
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://webpage-screen-shotter.vercel.app"
+
   // Cleanup function for SSE
   useEffect(() => {
     return () => {
@@ -26,11 +28,10 @@ function App() {
 
   const saveScreenshotsToPublic = async (screenshots) => {
     try {
-      // Generate a unique folder name using timestamp
       const timestamp = Date.now()
       const folderName = `screenshots_${timestamp}`
-
-      const response = await axios.post("https://webpage-screen-shotter.vercel.app/save-screenshots", {
+      
+      const response = await axios.post(`${BACKEND_URL}/save-screenshots`, {
         screenshots,
         folderName
       })
@@ -53,7 +54,7 @@ function App() {
       eventSource.close()
     }
 
-    const sse = new EventSource(`https://webpage-screen-shotter.vercel.app/capture-progress?url=${encodeURIComponent(url)}`)
+    const sse = new EventSource(`${BACKEND_URL}/capture-progress?url=${encodeURIComponent(url)}`)
     setEventSource(sse)
 
     sse.onmessage = (event) => {
