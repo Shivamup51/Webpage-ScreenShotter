@@ -1,8 +1,7 @@
 const express = require("express")
 const router = express.Router()
 const screenshotController = require("../controllers/screenshotController")
-const puppeteer = require("puppeteer-core")
-const chrome = require("@sparticuz/chromium")
+const puppeteer = require("puppeteer")
 const fs = require("fs").promises
 const path = require("path")
 
@@ -19,7 +18,7 @@ router.post("/save-screenshots", screenshotController.saveScreenshots)
 
 router.get("/capture-progress", async (req, res) => {
     const { url } = req.query
-    let browser = null
+    let browser = null;
     
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache')
@@ -27,153 +26,94 @@ router.get("/capture-progress", async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
 
     try {
-        console.log("Starting screenshot capture for URL:", url)
-
-        // Configure chrome options for Vercel
-        const options = {
-            args: [
-                ...chrome.args,
-                "--hide-scrollbars",
-                "--disable-web-security",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-gpu",
-                "--no-first-run",
-                "--no-zygote",
-                "--single-process"
-            ],
+        // Launch browser with specific viewport size
+        browser = await puppeteer.launch({
+            headless: true,
             defaultViewport: {
                 width: 1920,
-                height: 1080,
-                deviceScaleFactor: 1
+                height: 1080
             },
-            executablePath: await chrome.executablePath(),
-            headless: true,
-            ignoreHTTPSErrors: true,
-        }
+            args: ['--no-sandbox']
+        });
 
-        console.log("Launching browser with options:", JSON.stringify(options))
-        browser = await puppeteer.launch(options)
-        
-        console.log("Creating new page")
         const page = await browser.newPage()
         
-        // Set longer timeouts
-        await page.setDefaultNavigationTimeout(60000)
-        await page.setDefaultTimeout(60000)
-
-        console.log("Sending initial progress")
-        res.write(`data: ${JSON.stringify({ progress: 10 })}\n\n`)
-
-        console.log("Navigating to URL")
-        try {
-            await page.goto(url, { 
-                waitUntil: ['load', 'networkidle0'],
-                timeout: 60000 
-            })
-        } catch (navigationError) {
-            console.error("Navigation error:", navigationError)
-            res.write(`data: ${JSON.stringify({ error: "Failed to load the webpage. Please check the URL and try again." })}\n\n`)
-            res.end()
-            return
-        }
-
-        console.log("Getting page height")
-        const pageHeight = await page.evaluate(() => {
-            return Math.max(
-                document.documentElement.scrollHeight,
-                document.body.scrollHeight,
-                1080
-            )
+        // Set high-quality viewport
+        await page.setViewport({ 
+            width: 1920,    // Full HD width
+            height: 1080,   // Full HD height
+            deviceScaleFactor: 2  // Increased for better quality
         })
 
-        console.log("Page height:", pageHeight)
+        res.write(`data: ${JSON.stringify({ progress: 10 })}\n\n`)
+
+        // Load page and wait for content
+        await page.goto(url, { 
+            waitUntil: 'networkidle0',
+            timeout: 30000 
+        })
+        
+        // Get full page height
+        const pageHeight = await page.evaluate(() => 
+            Math.max(
+                document.documentElement.scrollHeight,
+                document.body.scrollHeight
+            )
+        )
+
+        // Create directory for sequential screenshots
+        const folderName = `webpage_screenshots_${Date.now()}`
+        const screenshotsDir = path.join(__dirname, '..', '..', 'client', 'public', 'screenshots', folderName)
+        await fs.mkdir(screenshotsDir, { recursive: true })
+
         const screenshots = []
-        const sectionHeight = 1080
+        const sectionHeight = 1080  // Full HD height
         const sections = Math.ceil(pageHeight / sectionHeight)
 
-        console.log("Starting screenshot capture, sections:", sections)
+        // Take sequential screenshots
         for (let i = 0; i < sections; i++) {
-            try {
-                console.log(`Capturing section ${i + 1} of ${sections}`)
-                
-                await page.evaluate((i, height) => {
-                    window.scrollTo(0, i * height)
-                }, i, sectionHeight)
+            // Ensure proper sequential naming (img01.png, img02.png, etc.)
+            const fileName = `img${String(i + 1).padStart(2, '0')}.png`
+            const filePath = path.join(screenshotsDir, fileName)
 
-                // Wait for scrolling and content to settle
-                await page.waitForTimeout(1000)
+            // Capture screenshot with precise dimensions
+            await page.screenshot({
+                path: filePath,
+                clip: {
+                    x: 0,
+                    y: i * sectionHeight,
+                    width: 1920,
+                    height: Math.min(sectionHeight, pageHeight - (i * sectionHeight))
+                },
+                type: 'png',  // Ensure high quality for AI processing
+                omitBackground: false  // Include background for complete UI capture
+            })
 
-                const screenshot = await page.screenshot({
-                    type: 'png',
-                    encoding: 'base64',
-                    clip: {
-                        x: 0,
-                        y: i * sectionHeight,
-                        width: 1920,
-                        height: Math.min(sectionHeight, pageHeight - (i * sectionHeight))
-                    },
-                    omitBackground: false
-                })
+            screenshots.push({
+                fileName,
+                imageUrl: `/screenshots/${folderName}/${fileName}`,
+                order: i + 1
+            })
 
-                screenshots.push({
-                    fileName: `screenshot_${(i + 1).toString().padStart(2, '0')}.png`,
-                    base64: screenshot,
-                    order: i + 1,
-                    imageUrl: `/screenshots/screenshot_${(i + 1).toString().padStart(2, '0')}.png`
-                })
-
-                const progress = Math.floor(30 + ((i + 1) / sections * 60))
-                res.write(`data: ${JSON.stringify({ progress })}\n\n`)
-
-            } catch (screenshotError) {
-                console.error(`Error capturing section ${i + 1}:`, screenshotError)
-                continue
-            }
+            const progress = Math.floor(30 + ((i + 1) / sections * 60))
+            res.write(`data: ${JSON.stringify({ progress })}\n\n`)
         }
 
-        console.log(`Captured ${screenshots.length} screenshots`)
-        if (screenshots.length > 0) {
-            res.write(`data: ${JSON.stringify({
-                progress: 100,
-                screenshots
-            })}\n\n`)
-        } else {
-            res.write(`data: ${JSON.stringify({ 
-                error: "Failed to capture any screenshots" 
-            })}\n\n`)
-        }
+        res.write(`data: ${JSON.stringify({
+            progress: 100,
+            screenshots
+        })}\n\n`)
+
+        await browser.close()
+        res.end()
 
     } catch (error) {
-        console.error("Capture error:", error)
-        res.write(`data: ${JSON.stringify({ 
-            error: "Failed to capture screenshots. Please try again." 
-        })}\n\n`)
-    } finally {
         if (browser) {
-            console.log("Closing browser")
             await browser.close()
         }
+        res.write(`data: ${JSON.stringify({ error: "Failed to capture screenshots" })}\n\n`)
         res.end()
     }
-})
-
-// Health check endpoint
-router.get("/health", (req, res) => {
-    res.json({ status: "OK" })
-})
-
-// Add this route to test environment variables
-router.get("/test-env", (req, res) => {
-    res.json({
-        nodeEnv: process.env.NODE_ENV,
-        frontendUrl: process.env.FRONTEND_URL
-    })
-})
-
-// Test endpoint
-router.get("/test", (req, res) => {
-    res.json({ status: "OK", message: "Screenshot service is running" })
 })
 
 module.exports = router

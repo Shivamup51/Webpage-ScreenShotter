@@ -1,49 +1,49 @@
 const express = require("express")
 const cors = require("cors")
 const path = require("path")
-require('dotenv').config()
-
-// Import routes
 const screenshotRoutes = require("./routes/screenshotRoutes")
 
 const app = express()
-const PORT = process.env.PORT || 3000
-const FRONTEND_URL = process.env.FRONTEND_URL || "https://webpage-screen-shotter-frontend.vercel.app"
-
-// Middleware
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
-
-// CORS configuration
 app.use(cors({
-    origin: [FRONTEND_URL, "https://webpage-screen-shotter.vercel.app"],
+    origin: "http://localhost:5173",
     credentials: true,
+    // Add these headers for SSE support
     methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Content-Type", "Accept"]
 }))
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
-// Serve static files
-app.use('/screenshots', express.static(path.join(__dirname, 'public', 'screenshots')))
+// Middleware to handle SSE connections
+app.use((req, res, next) => {
+    // Check if it's an SSE request
+    if (req.headers.accept && req.headers.accept === 'text/event-stream') {
+        res.setHeader('Content-Type', 'text/event-stream')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader('Connection', 'keep-alive')
+        
+        // Keep the connection alive
+        const intervalId = setInterval(() => {
+            res.write(':keepalive\n\n')
+        }, 30000)
 
-// Routes
-app.use('/', screenshotRoutes)
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack)
-    res.status(500).json({ error: 'Something broke!' })
+        // Clean up on client disconnect
+        res.on('close', () => {
+            clearInterval(intervalId)
+        })
+    }
+    next()
 })
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'OK' })
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/screenshots', express.static(path.join(__dirname, '..', 'client', 'public', 'screenshots')));
+
+app.use("/", screenshotRoutes)
+
+const PORT = process.env.PORT || 3001
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
 })
-
-if (require.main === module) {
-    app.listen(PORT, () => {
-        console.log(`Server is running on port ${PORT}`)
-    })
-}
-
-module.exports = app
 
