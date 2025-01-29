@@ -39,8 +39,8 @@ Webpage Screenshotter is a web application that allows users to capture multiple
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/webpage-screenshotter.git
-cd webpage-screenshotter
+git clone [https://github.com/Shivamup51/Webpage-ScreenShotter.git]
+cd Webpage-ScreenShotter
 ```
 
 2. Install dependencies
